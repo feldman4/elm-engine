@@ -2,59 +2,90 @@ module Remote exposing (..)
 
 import Http
 import Html
-import Xml
-import Xml.Decode
-import Xml.Query
 import Result.Extra
 import Json.Decode as JD exposing (at, int, string)
 import Json.Decode.Pipeline exposing (decode, custom)
-import Xml.Extra exposing (TagSpec, Required(..), decodeXml)
+import Xml.Extra exposing (Required(..), decodeXml, multipleTag, requiredTag)
+
+
+-- TYPES AND DECODERS
 
 
 type alias Map =
     { chipset_id : Int
     , width : Int
     , height : Int
-
-    -- , lower_layer : List Int
+    , lower_layer : List Int
+    , upper_layer : List Int
     }
 
 
-simpleDecoder : JD.Decoder Map
-simpleDecoder =
+mapDecoder : JD.Decoder Map
+mapDecoder =
     decode Map
         |> custom (at [ "chipset_id" ] int)
         |> custom (at [ "width" ] int)
         |> custom (at [ "height" ] int)
+        |> custom (at [ "lower_layer" ] intStringList)
+        |> custom (at [ "upper_layer" ] intStringList)
 
 
-simpleTagSpecs : List ( String, Required )
-simpleTagSpecs =
-    [ ( "chipset_id", Required )
-    , ( "width", Required )
-    , ( "height", Required )
+type alias Event =
+    { name : String
+    , x : Int
+    , y : Int
+    }
+
+
+eventDecoder : JD.Decoder Event
+eventDecoder =
+    decode Event
+        |> custom (at [ "name" ] string)
+        |> custom (at [ "x" ] int)
+        |> custom (at [ "y" ] int)
+
+
+eventTagSpec : List ( String, Required )
+eventTagSpec =
+    [ ( "name", Required )
+    , ( "x", Required )
+    , ( "y", Required )
     ]
 
 
-decodeFuckingXml : String -> Result Xml.Extra.Error Map
-decodeFuckingXml xml =
-    decodeXml xml "Map" simpleDecoder simpleTagSpecs
+eventsDecoder : JD.Decoder (List Event)
+eventsDecoder =
+    (\d -> requiredTag "events" d [ ( "Event", Multiple ) ]) <|
+        multipleTag "Event" eventDecoder eventTagSpec
 
 
-eventDecoder : JD.Decoder Map
-eventDecoder =
+decodeAllEventsXml : String -> Result Xml.Extra.Error (List Event)
+decodeAllEventsXml xml =
+    decodeXml xml "Map" eventsDecoder [ ( "events", Required ) ]
+
+
+mapTagSpecs : List ( String, Required )
+mapTagSpecs =
+    [ ( "chipset_id", Required )
+    , ( "width", Required )
+    , ( "height", Required )
+    , ( "lower_layer", Required )
+    , ( "upper_layer", Required )
+    ]
+
+
+decodeMapXml : String -> Result Xml.Extra.Error Map
+decodeMapXml xml =
+    decodeXml xml "Map" mapDecoder mapTagSpecs
+
+
+{-| Useful for decoding XML like <tag>4500 4500 4500</tag> into [4500, 4500, 4500].
+-}
+intStringList : JD.Decoder (List Int)
+intStringList =
     let
-        decodeMap =
-            at [ "Map", "valu" ] << JD.index 1
-
-        get field =
-            at [ field, "value" ]
-
-        getMap field =
-            decodeMap << get field
-
-        intStringList : String -> JD.Decoder (List Int)
-        intStringList string =
+        inner : String -> JD.Decoder (List Int)
+        inner string =
             let
                 result =
                     string |> String.words |> List.map String.toInt |> Result.Extra.combine
@@ -65,100 +96,14 @@ eventDecoder =
 
                     Result.Err s ->
                         JD.fail s
-
-        f =
-            JD.andThen intStringList string
     in
-        decode Map
-            |> custom (getMap "chipset_id" int)
-            |> custom (getMap "width" int)
-            |> custom (getMap "height" int)
-
-
-
--- |> custom f
--- |> custom (getMap "lower_layer" intStringList)
+        JD.andThen inner string
 
 
 process : String -> String
-process x =
-    let
-        xml =
-            x
-                |> Xml.Decode.decode
-                |> Result.map (Xml.Query.tags "Map")
-                |> Result.andThen (List.head >> Result.fromMaybe "no Map")
-
-        lower_layer =
-            xml
-                |> Result.andThen (getFirstThing "lower_layer" listOfInt)
-
-        width =
-            xml |> Result.andThen (getFirstThing "width" Xml.Query.int)
-
-        events =
-            xml |> Result.map (Xml.Query.tags "Event")
-
-        getEventId event =
-            event |> getFirstThing "name" Xml.Query.string
-
-        eventIds =
-            events
-                |> Result.map (List.map getEventId)
-                |> Result.andThen Result.Extra.combine
-
-        value =
-            eventIds
-
-        json =
-            xml
-                |> Result.map Xml.xmlToJson
-                |> Result.andThen (JD.decodeValue eventDecoder)
-    in
-        -- value |> Result.map toString |> Result.Extra.merge
-        -- json |> toString
-        x |> decodeFuckingXml |> toString
-
-
-getFirstThing :
-    String
-    -> (Xml.Value -> Result String b)
-    -> Xml.Value
-    -> Result String b
-getFirstThing parentTag xmlQuery xml =
-    xml
-        |> Xml.Query.tags parentTag
-        |> List.head
-        |> Maybe.andThen stepIn
-        |> Result.fromMaybe (parentTag ++ " not found")
-        |> Result.andThen xmlQuery
-
-
-listOfInt : Xml.Value -> Result String (List Int)
-listOfInt =
-    xmlQueryList String.toInt
-
-
-xmlQueryList :
-    (String -> Result String a)
-    -> Xml.Value
-    -> Result String (List a)
-xmlQueryList stringToX value =
-    value
-        |> Xml.Query.string
-        |> Result.map String.words
-        |> Result.map (List.map stringToX)
-        |> Result.andThen Result.Extra.combine
-
-
-stepIn : Xml.Value -> Maybe Xml.Value
-stepIn node =
-    case node of
-        Xml.Tag _ _ content ->
-            Just content
-
-        _ ->
-            Nothing
+process =
+    -- decodeMapXml >> toString
+    decodeAllEventsXml >> toString
 
 
 update : Msg -> Model -> ( Model, Cmd msg )
