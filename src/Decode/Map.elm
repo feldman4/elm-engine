@@ -1,16 +1,21 @@
-module Decode.Map exposing (..)
+module Decode.Map exposing (decodeMapXml)
 
 import Http
 import Html
-import Result.Extra
 import Json.Decode as JD exposing (at, int, string, nullable)
 import Json.Decode.Pipeline exposing (decode, custom)
 import Xml.Extra exposing (Required(..), decodeXml, multipleTag, requiredTag, optionalTag)
+import Decode.Shared exposing (..)
 
 
 decodeMapXml : String -> Result Xml.Extra.Error Map
 decodeMapXml xml =
     decodeXml xml "Map" mapDecoder mapTagSpecs
+
+
+demoResource : String
+demoResource =
+    "/resources/Map0002.emu"
 
 
 
@@ -151,42 +156,7 @@ eventCommandsDecoder =
 
 
 
--- ADDITIONAL DECODERS
-
-
-nString : JD.Decoder String
-nString =
-    JD.oneOf [ JD.null "", int |> JD.map toString, JD.string ]
-
-
-{-| Useful for decoding XML like <tag>4500 4500 4500</tag> into [4500, 4500, 4500].
-<tag></tag> becomes the empty list.
--}
-intStringList : JD.Decoder (List Int)
-intStringList =
-    let
-        inner : String -> JD.Decoder (List Int)
-        inner string =
-            let
-                result =
-                    case string of
-                        "" ->
-                            Result.Ok []
-
-                        _ ->
-                            string
-                                |> String.words
-                                |> List.map String.toInt
-                                |> Result.Extra.combine
-            in
-                case result of
-                    Result.Ok x ->
-                        JD.succeed x
-
-                    Result.Err s ->
-                        JD.fail s
-    in
-        nString |> JD.andThen inner
+-- APP
 
 
 process : String -> String
@@ -194,14 +164,10 @@ process =
     decodeMapXml >> toString
 
 
-
--- APP
-
-
 main : Program Never { error : Maybe Http.Error, value : String } Msg
 main =
     Html.program
-        { init = init "resources/Map0002.emu"
+        { init = init demoResource
         , update = update
         , view = view
         , subscriptions = (\_ -> Sub.none)
