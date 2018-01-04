@@ -3,11 +3,6 @@ module Setters exposing (..)
 -- TEXT SETTERS
 
 
-up : a -> (b -> c -> c) -> (d -> Result error b) -> d -> c -> c
-up fieldName =
-    update
-
-
 update : (a -> b -> b) -> (c -> Result error a) -> c -> b -> b
 update setField cast string object =
     case cast string of
@@ -16,21 +11,6 @@ update setField cast string object =
 
         Result.Err err ->
             object
-
-
-type alias Decoder a =
-    { decode : String -> Maybe a
-    }
-
-
-applyList : a -> List (a -> a) -> a
-applyList x fs =
-    case fs of
-        [] ->
-            x
-
-        f :: rest ->
-            applyList (f x) rest
 
 
 

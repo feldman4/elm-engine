@@ -1,6 +1,7 @@
-module Parsers exposing (..)
+module Types.Decode exposing (..)
 
 import Types exposing (..)
+
 
 toPiece : String -> Result String Piece
 toPiece s =

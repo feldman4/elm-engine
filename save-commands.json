@@ -1,6 +1,6 @@
 {
   "commands": [
-  "*.elm : elm-make Remote.elm --output Remote.html"
+  "src/*.elm : elm-make src/Decode/Map.elm --output build/Decode_Map.html"
   ]
   , "template": [
     "*.elm : elm-make {relFullPath} --output {relPath}{name}.html"

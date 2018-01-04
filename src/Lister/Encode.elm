@@ -1,4 +1,4 @@
-module Encode exposing (..)
+module Lister.Encode exposing (..)
 
 import Types exposing (..)
 import Dict
@@ -12,6 +12,7 @@ toJson x =
     x |> toString |> encode
 
 
+toJsonString : a -> String
 toJsonString =
     toJson >> JE.encode 1
 

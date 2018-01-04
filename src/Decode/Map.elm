@@ -1,4 +1,4 @@
-module Remote exposing (..)
+module Decode.Map exposing (..)
 
 import Http
 import Html
@@ -194,6 +194,20 @@ process =
     decodeMapXml >> toString
 
 
+
+-- APP
+
+
+main : Program Never { error : Maybe Http.Error, value : String } Msg
+main =
+    Html.program
+        { init = init "resources/Map0002.emu"
+        , update = update
+        , view = view
+        , subscriptions = (\_ -> Sub.none)
+        }
+
+
 update : Msg -> Model -> ( Model, Cmd msg )
 update msg model =
     case msg of
@@ -204,26 +218,11 @@ update msg model =
             { model | error = Just s } ! []
 
 
-main : Program Never { error : Maybe Http.Error, value : String } Msg
-main =
-    Html.program
-        { init = init
-        , update = update
-        , view = view
-        , subscriptions = (\_ -> Sub.none)
-        }
-
-
-localUrl : String
-localUrl =
-    "resources/Map0002.emu"
-
-
-init : ( { error : Maybe a, value : String }, Cmd Msg )
-init =
+init : String -> ( { error : Maybe a, value : String }, Cmd Msg )
+init url =
     let
         request =
-            localUrl |> Http.getString
+            url |> Http.getString
     in
         { value = "", error = Nothing } ! [ Http.send Response request ]
 
@@ -249,16 +248,3 @@ type alias Model =
 
 type Msg
     = Response (Result Http.Error String)
-
-
-{-| Google drive hosting needs authentication, couldn't figure out public
-solution.
--}
-gDriveBase : String
-gDriveBase =
-    "https://docs.google.com/uc?export=download"
-
-
-gDriveID : String
-gDriveID =
-    "1eNpVv5jgPB6bSot6dY0U_V9HhF1WF6IM"

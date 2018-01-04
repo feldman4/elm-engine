@@ -22,3 +22,19 @@ type Entity
         , sprite : Maybe Sprite
         , inventory : Maybe Inventory
         }
+
+
+type alias Sprite =
+    String
+
+
+type alias Animation a =
+    Float -> a -> a
+
+
+type alias Event a =
+    a -> a
+
+
+type alias Inventory =
+    List String
