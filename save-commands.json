@@ -1,0 +1,8 @@
+{
+  "commands": [
+  "*.elm : elm-make Remote.elm --output Remote.html"
+  ]
+  , "template": [
+    "*.elm : elm-make {relFullPath} --output {relPath}{name}.html"
+  ]
+}
