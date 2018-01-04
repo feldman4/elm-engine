@@ -3,12 +3,18 @@ module Remote exposing (..)
 import Http
 import Html
 import Result.Extra
-import Json.Decode as JD exposing (at, int, string)
+import Json.Decode as JD exposing (at, int, string, nullable)
 import Json.Decode.Pipeline exposing (decode, custom)
-import Xml.Extra exposing (Required(..), decodeXml, multipleTag, requiredTag)
+import Xml.Extra exposing (Required(..), decodeXml, multipleTag, requiredTag, optionalTag)
 
 
--- TYPES AND DECODERS
+decodeMapXml : String -> Result Xml.Extra.Error Map
+decodeMapXml xml =
+    decodeXml xml "Map" mapDecoder mapTagSpecs
+
+
+
+-- MAP
 
 
 type alias Map =
@@ -17,7 +23,19 @@ type alias Map =
     , height : Int
     , lower_layer : List Int
     , upper_layer : List Int
+    , events : List Event
     }
+
+
+mapTagSpecs : List ( String, Required )
+mapTagSpecs =
+    [ ( "chipset_id", Required )
+    , ( "width", Required )
+    , ( "height", Required )
+    , ( "lower_layer", Required )
+    , ( "upper_layer", Required )
+    , ( "events", Required )
+    ]
 
 
 mapDecoder : JD.Decoder Map
@@ -28,13 +46,28 @@ mapDecoder =
         |> custom (at [ "height" ] int)
         |> custom (at [ "lower_layer" ] intStringList)
         |> custom (at [ "upper_layer" ] intStringList)
+        |> custom eventsDecoder
+
+
+
+-- EVENT
 
 
 type alias Event =
     { name : String
     , x : Int
     , y : Int
+    , pages : List EventPage
     }
+
+
+eventTagSpec : List ( String, Required )
+eventTagSpec =
+    [ ( "name", Required )
+    , ( "x", Required )
+    , ( "y", Required )
+    , ( "pages", Required )
+    ]
 
 
 eventDecoder : JD.Decoder Event
@@ -43,14 +76,7 @@ eventDecoder =
         |> custom (at [ "name" ] string)
         |> custom (at [ "x" ] int)
         |> custom (at [ "y" ] int)
-
-
-eventTagSpec : List ( String, Required )
-eventTagSpec =
-    [ ( "name", Required )
-    , ( "x", Required )
-    , ( "y", Required )
-    ]
+        |> custom eventPagesDecoder
 
 
 eventsDecoder : JD.Decoder (List Event)
@@ -59,27 +85,82 @@ eventsDecoder =
         multipleTag "Event" eventDecoder eventTagSpec
 
 
-decodeAllEventsXml : String -> Result Xml.Extra.Error (List Event)
-decodeAllEventsXml xml =
-    decodeXml xml "Map" eventsDecoder [ ( "events", Required ) ]
+
+-- EVENT PAGE
 
 
-mapTagSpecs : List ( String, Required )
-mapTagSpecs =
-    [ ( "chipset_id", Required )
-    , ( "width", Required )
-    , ( "height", Required )
-    , ( "lower_layer", Required )
-    , ( "upper_layer", Required )
+type alias EventPage =
+    { event_commands : List EventCommand
+    }
+
+
+eventPageTagSpec : List ( String, Required )
+eventPageTagSpec =
+    [ ( "event_commands", Required )
     ]
 
 
-decodeMapXml : String -> Result Xml.Extra.Error Map
-decodeMapXml xml =
-    decodeXml xml "Map" mapDecoder mapTagSpecs
+eventPageDecoder : JD.Decoder EventPage
+eventPageDecoder =
+    decode EventPage
+        |> custom eventCommandsDecoder
+
+
+eventPagesDecoder : JD.Decoder (List EventPage)
+eventPagesDecoder =
+    (\d -> requiredTag "pages" d [ ( "EventPage", Multiple ) ]) <|
+        multipleTag "EventPage" eventPageDecoder eventPageTagSpec
+
+
+
+-- EVENT COMMAND
+
+
+type alias EventCommand =
+    { code : Int
+    , indent : Int
+    , string : String
+    , parameters : List Int
+    }
+
+
+eventCommandTagSpec : List ( String, Required )
+eventCommandTagSpec =
+    [ ( "code", Required )
+    , ( "indent", Required )
+    , ( "string", Required )
+    , ( "parameters", Required )
+    ]
+
+
+eventCommandDecoder : JD.Decoder EventCommand
+eventCommandDecoder =
+    decode EventCommand
+        |> custom (at [ "code" ] int)
+        |> custom (at [ "indent" ] int)
+        |> custom (at [ "string" ] nString)
+        |> custom (at [ "parameters" ] intStringList)
+
+
+eventCommandsDecoder : JD.Decoder (List EventCommand)
+eventCommandsDecoder =
+    ((\d -> optionalTag "event_commands" d [ ( "EventCommand", Multiple ) ]) <|
+        multipleTag "EventCommand" eventCommandDecoder eventCommandTagSpec
+    )
+        |> JD.map (Maybe.withDefault [])
+
+
+
+-- ADDITIONAL DECODERS
+
+
+nString : JD.Decoder String
+nString =
+    JD.oneOf [ JD.null "", int |> JD.map toString, JD.string ]
 
 
 {-| Useful for decoding XML like <tag>4500 4500 4500</tag> into [4500, 4500, 4500].
+<tag></tag> becomes the empty list.
 -}
 intStringList : JD.Decoder (List Int)
 intStringList =
@@ -88,7 +169,15 @@ intStringList =
         inner string =
             let
                 result =
-                    string |> String.words |> List.map String.toInt |> Result.Extra.combine
+                    case string of
+                        "" ->
+                            Result.Ok []
+
+                        _ ->
+                            string
+                                |> String.words
+                                |> List.map String.toInt
+                                |> Result.Extra.combine
             in
                 case result of
                     Result.Ok x ->
@@ -97,13 +186,12 @@ intStringList =
                     Result.Err s ->
                         JD.fail s
     in
-        JD.andThen inner string
+        nString |> JD.andThen inner
 
 
 process : String -> String
 process =
-    -- decodeMapXml >> toString
-    decodeAllEventsXml >> toString
+    decodeMapXml >> toString
 
 
 update : Msg -> Model -> ( Model, Cmd msg )
