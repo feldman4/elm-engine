@@ -1,7 +1,8 @@
 {
   "commands": [
   "src/Decode/Map.elm : elm-make src/Decode/Map.elm --output build/Decode_Map.html",
-  "src/Decode/Database.elm : elm-make src/Decode/Database.elm --output build/Decode_Database.html"
+  "src/Decode/Database.elm : elm-make src/Decode/Database.elm --output build/Decode_Database.html",
+  "src/Map.elm : elm-make src/Map.elm --output build/Map.html --debug"
   ]
   , "template": [
     "*.elm : elm-make {relFullPath} --output {relPath}{name}.html"

@@ -1,4 +1,4 @@
-module Database exposing (decodeDatabaseXml)
+module Decode.Database exposing (decodeDatabaseXml, Database, Chipset)
 
 import Http
 import Html
@@ -8,9 +8,10 @@ import Xml.Extra exposing (Required(..), decodeXml, multipleTag, requiredTag, op
 import Decode.Shared exposing (..)
 
 
-decodeDatabaseXml : String -> Result Xml.Extra.Error Database
+decodeDatabaseXml : String -> Result String Database
 decodeDatabaseXml xml =
     decodeXml xml "Database" databaseDecoder databaseTagSpecs
+        |> Result.mapError toString
 
 
 demoResource : String

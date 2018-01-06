@@ -1,4 +1,4 @@
-module Decode.Map exposing (decodeMapXml)
+module Decode.Map exposing (decodeMapXml, Map)
 
 import Http
 import Html
@@ -8,9 +8,10 @@ import Xml.Extra exposing (Required(..), decodeXml, multipleTag, requiredTag, op
 import Decode.Shared exposing (..)
 
 
-decodeMapXml : String -> Result Xml.Extra.Error Map
+decodeMapXml : String -> Result String Map
 decodeMapXml xml =
     decodeXml xml "Map" mapDecoder mapTagSpecs
+        |> Result.mapError toString
 
 
 demoResource : String
